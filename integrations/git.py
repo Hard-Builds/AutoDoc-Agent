@@ -39,7 +39,7 @@ class GithubClient(MCPClientABC):
     async def get_installation_token() -> str:
         app_id = os.getenv("GH_APP_ID")
         installation_id = os.getenv("GH_APP_INSTALLATION_ID")
-        private_key = os.getenv("GH_APP_PRIVATE_KEY")
+        private_key = os.getenv("GH_APP_PRIVATE_KEY", "").replace("\\n", "\n")
 
         now = int(time.time())
         payload = {
