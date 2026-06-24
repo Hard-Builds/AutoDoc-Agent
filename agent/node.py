@@ -62,6 +62,32 @@ async def analyzer(state: AgentState):
     }
 
 
+async def comment_analysis(state: AgentState):
+    git_tools = await GithubClient.get_tools()
+    comment_tool = next(filter(
+        lambda x: x.name == "pull_request_review_write",
+        git_tools
+    ))
+
+    components = ", ".join(state["affected_components"])
+    body = (
+        f"## AutoDoc Analysis\n\n"
+        f"**Architecturally significant**: Yes\n\n"
+        f"**Reasoning**: {state['reasoning']}\n\n"
+        f"**Affected components**: {components}\n\n"
+        f"---\nComment `/approve-autodoc` to update `ARCHITECTURE.md`."
+    )
+    _ = await comment_tool.ainvoke({
+        "method": "create",
+        "owner": state["repo_owner"],
+        "repo": state["repo_name"],
+        "pullNumber": state["pr_number"],
+        "body": body,
+        "event": "COMMENT"
+    })
+    return {}
+
+
 async def output(state: AgentState):
     if state["messages"] and isinstance(state["messages"][-1], ToolMessage):
         print(

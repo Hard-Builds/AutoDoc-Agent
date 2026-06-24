@@ -1,0 +1,10 @@
+name: AutoDoc Update
+
+on: 
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  update:
+    if: github.event.review.state == 'approved'
+    environment: autodoc-approval
