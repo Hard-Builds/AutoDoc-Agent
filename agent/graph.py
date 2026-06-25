@@ -1,7 +1,6 @@
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.constants import START, END
 from langgraph.graph import StateGraph
-from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.prebuilt import ToolNode
 
 from agent import node
 from agent.state import AgentState
@@ -15,8 +14,9 @@ class Graph:
 
         builder.add_node("fetch", node.fetch_pr_details)
         builder.add_node("analysis", node.analyzer)
-        builder.add_node("comment", node.comment_analysis)
+        builder.add_node("pr_review", node.add_pr_review)
         builder.add_node("output", node.output)
+        builder.add_node("resolve_pr_review", node.resolve_pr_review)
 
         git_tool_node = ToolNode(await GithubClient.get_tools())
         builder.add_node("tools", git_tool_node)
@@ -26,14 +26,19 @@ class Graph:
         builder.add_conditional_edges(
             "analysis",
             lambda state: state["is_significant"],
-            {True: "comment", False: END}
+            {True: "pr_review", False: END}
         )
-        builder.add_edge("comment", "output")
-        builder.add_conditional_edges("output", tools_condition)
+        builder.add_edge("pr_review", "output")
+        builder.add_conditional_edges(
+            "output",
+            node.output_router,
+            {"tools": "tools", "resolve_pr_review": "resolve_pr_review"}
+        )
         builder.add_edge("tools", "output")
+        builder.add_edge("resolve_pr_review", END)
 
         graph = builder.compile(
             checkpointer=checkpointer,
-            interrupt_after=["comment"]
+            interrupt_after=["pr_review"]
         )
         return graph

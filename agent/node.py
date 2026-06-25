@@ -4,6 +4,7 @@ from typing import List
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langgraph.prebuilt import tools_condition
 from pydantic import BaseModel, Field
 
 from agent.state import AgentState, MAX_ITERATIONS
@@ -62,9 +63,9 @@ async def analyzer(state: AgentState):
     }
 
 
-async def comment_analysis(state: AgentState):
+async def add_pr_review(state: AgentState):
     git_tools = await GithubClient.get_tools()
-    comment_tool = next(filter(
+    pr_review_tool = next(filter(
         lambda x: x.name == "pull_request_review_write",
         git_tools
     ))
@@ -72,12 +73,12 @@ async def comment_analysis(state: AgentState):
     components = ", ".join(state["affected_components"])
     body = (
         f"## AutoDoc Analysis\n\n"
-        f"**Architecturally significant**: Yes\n\n"
+        f"I've reviewed this PR and found it to be architecturally significant.\n\n"
         f"**Reasoning**: {state['reasoning']}\n\n"
         f"**Affected components**: {components}\n\n"
-        f"---\nComment `/approve-autodoc` to update `ARCHITECTURE.md`."
+        f"---\nPlease Comment `/approve-autodoc` and I'll update `ARCHITECTURE.md` accordingly."
     )
-    _ = await comment_tool.ainvoke({
+    _ = await pr_review_tool.ainvoke({
         "method": "create",
         "owner": state["repo_owner"],
         "repo": state["repo_name"],
@@ -134,3 +135,27 @@ async def output(state: AgentState):
 
     response = await llm_with_tools.ainvoke(messages)
     return {"messages": new_messages + [response], "iteration": iteration + 1}
+
+
+def output_router(state: AgentState):
+    response = tools_condition(state)
+    if response == "tools":
+        return "tools"
+    return "resolve_pr_review"
+
+
+async def resolve_pr_review(state: AgentState):
+    git_tools = await GithubClient.get_tools()
+    pr_review_tool = next(filter(
+        lambda x: x.name == "pull_request_review_write",
+        git_tools
+    ))
+    _ = await pr_review_tool.ainvoke({
+        "method": "create",
+        "owner": state["repo_owner"],
+        "repo": state["repo_name"],
+        "pullNumber": state["pr_number"],
+        "body": "AutoDoc has updated ARCHITECTURE.md.",
+        "event": "APPROVE"
+    })
+    return {}
