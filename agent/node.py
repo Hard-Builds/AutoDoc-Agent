@@ -12,7 +12,7 @@ from integrations import GithubClient
 
 
 async def fetch_pr_details(state: AgentState):
-    # Add github mcp call
+    """Fetch the raw unified diff for the PR via the GitHub MCP tool."""
     git_tools = await GithubClient.get_tools()
 
     pr_tool = next(filter(
@@ -33,7 +33,7 @@ async def fetch_pr_details(state: AgentState):
 
 
 async def analyzer(state: AgentState):
-    # takes the raw_diff and check if this is a arch level diff
+    """Use Gemini to decide if the PR diff represents an architecturally significant change."""
     class ArchitecturalAnalysis(BaseModel):
         is_significant: bool = Field(
             description="True if the PR changes architecture, infra or core patterns"
@@ -64,6 +64,7 @@ async def analyzer(state: AgentState):
 
 
 async def add_pr_review(state: AgentState):
+    """Post a REQUEST_CHANGES review on the PR asking a human to approve the doc update."""
     git_tools = await GithubClient.get_tools()
     pr_review_tool = next(filter(
         lambda x: x.name == "pull_request_review_write",
@@ -90,6 +91,7 @@ async def add_pr_review(state: AgentState):
 
 
 async def output(state: AgentState):
+    """Invoke Gemini with GitHub tools to read, update, and write back ARCHITECTURE.md."""
     if state["messages"] and isinstance(state["messages"][-1], ToolMessage):
         print(
             "Tool used: ",
@@ -138,6 +140,7 @@ async def output(state: AgentState):
 
 
 def output_router(state: AgentState):
+    """Route to the tools node if Gemini called a tool, otherwise to resolve_pr_review."""
     response = tools_condition(state)
     if response == "tools":
         return "tools"
@@ -145,6 +148,7 @@ def output_router(state: AgentState):
 
 
 async def resolve_pr_review(state: AgentState):
+    """Approve the PR to signal that ARCHITECTURE.md has been updated."""
     git_tools = await GithubClient.get_tools()
     pr_review_tool = next(filter(
         lambda x: x.name == "pull_request_review_write",

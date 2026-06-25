@@ -14,6 +14,7 @@ async def analyze_mode(
         pr_number: str,
         thread_id: str
 ):
+    """Run the full graph from scratch to analyse a PR and post the review."""
     config = {"configurable": {"thread_id": thread_id}}
     final_state = await graph.ainvoke(
         input={
@@ -27,6 +28,7 @@ async def analyze_mode(
 
 
 async def update_mode(graph, thread_id: str):
+    """Resume a previously interrupted graph run after human approval."""
     config = {"configurable": {"thread_id": thread_id}}
     final_state = await graph.ainvoke(
         input=None,
@@ -36,6 +38,7 @@ async def update_mode(graph, thread_id: str):
 
 
 async def main():
+    """Parse CLI args and dispatch to analyze_mode or update_mode."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--owner")
     parser.add_argument("--repo")

@@ -10,6 +10,7 @@ from integrations import GithubClient
 class Graph:
     @classmethod
     async def init(cls, checkpointer):
+        """Build and compile the LangGraph StateGraph with all nodes, edges, and the SQLite checkpointer."""
         builder = StateGraph(AgentState)
 
         builder.add_node("fetch", node.fetch_pr_details)

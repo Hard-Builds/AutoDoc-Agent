@@ -7,6 +7,8 @@ dir_path.mkdir(parents=True, exist_ok=True)
 
 
 class FileExplorer(MCPClientABC):
+    """MCP client for the local filesystem server, scoped to the docs directory."""
+
     _SERVERS = {
         "filesystem": {
             "command": "npx",

@@ -9,6 +9,8 @@ from integrations.base import MCPClientABC
 
 
 class GithubClient(MCPClientABC):
+    """MCP client for the GitHub Copilot MCP server, authenticated via GitHub App installation token."""
+
     _SERVERS = {
         "github": {
             "transport": "streamable_http",
@@ -25,6 +27,7 @@ class GithubClient(MCPClientABC):
 
     @classmethod
     async def get_client(cls):
+        """Fetch an installation token and initialise the MCP client with it."""
         if cls._client is None:
             token = await cls.get_installation_token()
             cls._SERVERS["github"].update({
@@ -37,6 +40,7 @@ class GithubClient(MCPClientABC):
 
     @staticmethod
     async def get_installation_token() -> str:
+        """Generate a GitHub App JWT and exchange it for a short-lived installation access token."""
         app_id = os.getenv("GH_APP_ID")
         installation_id = os.getenv("GH_APP_INSTALLATION_ID")
         private_key = os.getenv("GH_APP_PRIVATE_KEY", "").replace("\\n", "\n")
