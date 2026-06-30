@@ -1,6 +1,7 @@
 import os
 from typing import List
 
+import google.genai as genai
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -9,6 +10,24 @@ from pydantic import BaseModel, Field
 
 from agent.state import AgentState, MAX_ITERATIONS
 from integrations import GithubClient
+
+# Leave ~10% headroom below the model's 1M-token context window.
+_MAX_TOKENS = 900_000
+
+
+def _count_and_guard(text: str, label: str) -> int:
+    """Count tokens via Gemini's count_tokens API and raise if over the limit."""
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    result = client.models.count_tokens(model=model_name, contents=text)
+    count = result.total_tokens
+    print(f"[token-count] {label}: {count:,} tokens")
+    if count > _MAX_TOKENS:
+        raise ValueError(
+            f"{label} exceeds context limit: {count:,} > {_MAX_TOKENS:,} tokens. "
+            "Truncate the diff or split the PR before processing."
+        )
+    return count
 
 
 async def fetch_pr_details(state: AgentState):
@@ -44,6 +63,8 @@ async def analyzer(state: AgentState):
         affected_components: List[str] = Field(
             description="List of service or modules impacted"
         )
+
+    _count_and_guard(state["raw_diff"], "analyzer/raw_diff")
 
     llm = ChatGoogleGenerativeAI(model=os.getenv("GEMINI_MODEL"))
     llm = llm.with_structured_output(ArchitecturalAnalysis)
@@ -134,6 +155,12 @@ async def output(state: AgentState):
     if iteration >= MAX_ITERATIONS:
         raise RuntimeError(
             f"Output node exceeded {MAX_ITERATIONS} iterations — possible tool error loop.")
+
+    combined_text = "\n".join(
+        m.content if hasattr(m, "content") and isinstance(m.content, str) else str(m)
+        for m in messages
+    )
+    _count_and_guard(combined_text, f"output/iteration-{iteration}")
 
     response = await llm_with_tools.ainvoke(messages)
     return {"messages": new_messages + [response], "iteration": iteration + 1}
